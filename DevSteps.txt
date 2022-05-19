@@ -1,0 +1,6 @@
+Ce qu'il faut faire:-
+- Regrouper sur word (ou autre) les différentes fonctions et mettre (en une phrase) ce qu'elles font
+- Fonction time (pour la parti rapidité du cdc)
+- (A voir si on le fait : algo qui garde les LED allumer si ne détecte plus d'yeux)
+Du coup revoir ce que l'on fait dans étude des performances en fonction de notre cahier des charges
+- Voir le truc avec la bouche ...
