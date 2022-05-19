@@ -1,5 +1,5 @@
-# TIPE-Marc
-TIPE Marc
+# EyeDetection
+Eye Detection program for school project 
 
 ## IA_LED_v3_perf
 
