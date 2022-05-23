@@ -31,6 +31,7 @@ eyes_cascade_name = args.eyes_cascade
 face_cascade = cv.CascadeClassifier()
 eyes_cascade = cv.CascadeClassifier()
 
+global isEyeDetected
 isEyeDetected = 0
 
 ## METHODES ##
@@ -94,57 +95,65 @@ def detectObjects(frame):
     frame_gray = cv.equalizeHist(frame_gray)
     listEyes = []
     listError = []
+    firstFrame = frame_gray.shape
     
     #-- Detect faces
     faces = face_cascade.detectMultiScale(frame_gray)
 
     for (x,y,w,h) in faces:
-        #(x, y) are the coordonates of the down left corner of the rectangle face in the frame
+        #(x, y) are the coordonates of the up left corner of the rectangle face in the frame
         #(w, h) are the width and hight of the face
         center = (x + w//2, y + h//2)
         frame = cv.ellipse(frame, center, (w//2, h//2), 0, 0, 360, (255, 0, 255), 4)
 
         face_frame = frame_gray[y:y+h,x:x+w] #Select only the face rectangle
-
+        
+        secondFrame = face_frame.shape
+        augmFactor = (firstFrame[0]//secondFrame[0],firstFrame[1]//secondFrame[1])
+        
         #-- In each face, detect eyes
         eyes = eyes_cascade.detectMultiScale(face_frame)
         
         for (x2,y2,w2,h2) in eyes:
-            #(x2, y2) are the coordonates of the down left corner of the rectangle eye int the rectangle face
+            #print(eyes)
+            #print("y + h//2 =", (y + h//2)//augmFactor[1])
+            #(x2, y2) are the coordonates of the up left corner of the rectangle eye int the rectangle face
             #(w2, h2) are the width and hight of the eye
 
-            if y2 < y + h//2:
+            if y + y2 + h2//2 > (y + h//2):
                 #if mouth or nose are detected as eye
                 error_center = (x + x2 + w2//2, y + y2 + h2//2)
                 listError.append(error_center)
                 pass
-
-            eye_center = (x + x2 + w2//2, y + y2 + h2//2)
             
-            radius = int(round((w2 + h2)*0.25))
-            frame = cv.circle(frame, eye_center, radius, (255, 0, 0 ), 4)
-            
-            if listEyes == []:  # Pour permettre d'avoir l'oeil gauche en 0
-                listEyes.append(eye_center)
-            elif len(listEyes) == 1:
-                if listEyes[0][0] > eye_center[0]:
-                    listEyes.insert(0,eye_center)
-                else:
+            else:
+                eye_center = (x + x2 + w2//2, y + y2 + h2//2)
+                
+                radius = int(round((w2 + h2)*0.25))
+                frame = cv.circle(frame, eye_center, radius, (255, 0, 0 ), 4)
+                
+                if listEyes == []:  # Pour permettre d'avoir l'oeil gauche en 0
                     listEyes.append(eye_center)
+                elif len(listEyes) == 1:
+                    if listEyes[0][0] > eye_center[0]:
+                        listEyes.insert(0,eye_center)
+                    else:
+                        listEyes.append(eye_center)
                 
     return (frame, listEyes, listError)
         
 def ledManag(frame, listEyes, listLed):
     xMax = frame.get(cv.CAP_PROP_FRAME_WIDTH)
     yMax = frame.get(cv.CAP_PROP_FRAME_HEIGHT)
-
+    global isEyeDetected
+    
     X, Y = getAreas(xMax, yMax, XY_AREAS[0], XY_AREAS[1])    
     # X, Y are lists of the coordonates of the lines and columns on the frame
    
     try:
         for i in listLed :
             GPIO.output(i, GPIO.LOW) #On éteint les LEDs
-
+            #éteint time
         #Oeil gauche 
         for i in range (len(X)-1):
             # We try to find in which area the eye is (only one i will work)
@@ -154,6 +163,7 @@ def ledManag(frame, listEyes, listLed):
                     #We look for the y
                     if listEyes[0][1] > Y[j] and listEyes[0][1] < Y[j+1]:
                         # now that we have the coordonates of the area in which the eye is we can turn on the coresponding led (The led are in areas order)
+                        #alumée time
                         GPIO.output(listLed[j][i], GPIO.HIGH) #On allume la bonne led
                         
         #Oeil droit
@@ -163,7 +173,7 @@ def ledManag(frame, listEyes, listLed):
                 for j in range (len(Y)-1):
                     if listEyes[1][1] > Y[j] and listEyes[1][1] < Y[j+1]:
                         GPIO.output(listLed[j][i], GPIO.HIGH) #On allume la bonne led
-
+            
         isEyeDetected = 1 #Trigger eyes detected
 
     except IndexError:
@@ -186,12 +196,11 @@ def getAreas(x, y, xAreas, yAreas):
     return X, Y
 
 
-def precision(file):
+def precision(countEye, countError):
     
-    mouthRatio = 0
-    oneEyeRatio = 0
+    res = countError/(countEye + countError)
 
-    return mouthRatio, oneEyeRatio
+    return res
 
 def main(nb):
 
@@ -205,16 +214,21 @@ def main(nb):
     
     listEyes = []
     listError = []
+    global isEyeDetected
 
-    frname = "./Logs/RespondTime" + nb + ".txt"
-    ffname = "./Logs/LogFormes" + nb + ".txt"
+    frname = "./Logs/RespondTime" + str(nb) + ".csv"
+    ffname = "./Logs/LogFormes" + str(nb) + ".txt"
 
     fr = open(frname, "a")
+    fr.write("Num_Frame,Respond_Time,Eyes detected\n")
+    
     ff = open(ffname, "a")
     i = 0
-    t = time.time()
+    timer = 0
+    countEye = 0
+    countError = 0
 
-    while t < 60:   #1 minute recording
+    while timer < 20:   #1 minute recording
 
         start = 0 #To compute the respond time of a frame detection
         end = 0
@@ -239,26 +253,34 @@ def main(nb):
     ## LOGS ##
 
         print(f"Eye: {listEyes}, Error(s): {listError}\n")
-
+        
         ff.write(f"{i}- Eye: {listEyes}, error: {listError}\n")
-        fr.write(f"{i}- {end-start:.10f} Eyes detected: {isEyeDetected}\n")
-
+        countEye += len(listEyes) 
+        countError += len(listError) 
+        #fr.write(f"{i}- {end-start:.10f} Eyes detected: {isEyeDetected}\n")
+        fr.write(f"{i},{end-start:.10f},{isEyeDetected}\n")
+        
         i += 1
         isEyeDetected = 0 #restart the trigger 
 
 
-        t = time.time() - t
+        timer += (end - start)
+        
         if cv.waitKey(1) & 0xFF == ord('q'):
             break
-
+    
+    ratio = precision(countEye, countError)
+    print(f"Precision {ratio}")
+    
     closeFlow(cap,GPIO_LED)
     
 if __name__ == "__main__":
-    main(0)
+    #main(0)
+    main("poubelle")
 
 
 ## précision bonnes Led allumée + stats sur la nombre de détection de bouches // aux yeux
 
-#nbbouche // (nbbouch +nboeil) -> pourcentage de détection de bouche // nb de détection
+#nberror // (nbbouch +nboeil) -> pourcentage de détection de bouche // nb de détection
 # Précision : ratio bouche détection, ratio 1 seul oeil détecté
 #find what is x,x2 y,y2 (top, bottum left, right corner) ?
