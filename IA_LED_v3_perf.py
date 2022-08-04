@@ -1,5 +1,4 @@
 from __future__ import print_function
-from tkinter.tix import TCL_DONT_WAIT
 import cv2 as cv
 import RPi.GPIO as GPIO
 import argparse
@@ -33,12 +32,7 @@ face_cascade = cv.CascadeClassifier()
 eyes_cascade = cv.CascadeClassifier()
 
 global isEyeDetected
-global tDown
-global tUp
-
 isEyeDetected = 0
-tDown = 0
-tUp = 0
 
 ## METHODES ##
 
@@ -159,8 +153,7 @@ def ledManag(frame, listEyes, listLed):
     try:
         for i in listLed :
             GPIO.output(i, GPIO.LOW) #On éteint les LEDs
-            ##############################################################éteint time
-            tDown = time.time()
+            #éteint time
         #Oeil gauche 
         for i in range (len(X)-1):
             # We try to find in which area the eye is (only one i will work)
@@ -170,8 +163,7 @@ def ledManag(frame, listEyes, listLed):
                     #We look for the y
                     if listEyes[0][1] > Y[j] and listEyes[0][1] < Y[j+1]:
                         # now that we have the coordonates of the area in which the eye is we can turn on the coresponding led (The led are in areas order)
-                        #################################################################alumée time
-                        tUp = time.time()
+                        #alumée time
                         GPIO.output(listLed[j][i], GPIO.HIGH) #On allume la bonne led
                         
         #Oeil droit
@@ -255,8 +247,6 @@ def main(nb):
         img = drawGrid(img,listX,listY)
         displayFrame(img)
         (listX,listY) = ledManag(cap, listEyes, GPIO_LED)
-        tStable = tUp - tDown
-        print(f"Stability time evolution : {tStable}") 
 
         end = time.time() #The LED have been turned on
 
@@ -285,7 +275,7 @@ def main(nb):
     closeFlow(cap,GPIO_LED)
     
 if __name__ == "__main__":
-    #main(0)
+    #main(1)
     main("poubelle")
 
 
